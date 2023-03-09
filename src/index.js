@@ -44,17 +44,6 @@ const camera = new PerspectiveCamera();
 // const camera = new OrthographicCamera();
 camera.position.set(0, 0, 1000);
 
-const onResize = () => {
-	var width = window.innerWidth;
-	var height = window.innerHeight;
-	glRenderer.setSize(width, height);
-	// cssRenderer.setSize(width, height);
-	camera.aspect = width / height;
-	camera.updateProjectionMatrix();
-};
-window.addEventListener('resize', onResize);
-onResize();
-
 const controls = new TrackballControls(camera, glRenderer.domElement);
 controls.noPan = true;
 controls.minDistance = 130;
@@ -113,6 +102,20 @@ const composer = new EffectComposer(glRenderer);
 composer.addPass(renderScene);
 composer.addPass(bloomPass);
 
+const onResize = () => {
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+	// cssRenderer.setSize(width, height);
+	camera.aspect = width / height;
+	camera.updateProjectionMatrix();
+	glRenderer.setSize(width, height);
+	composer.setSize(width, height);
+	controls.handleResize();
+};
+window.addEventListener('resize', onResize);
+onResize();
+
+
 // PROJECT IMAGES
 const textureLoader = new TextureLoader();
 const projects = ['everythingisinterestingonce', 'landuse', 'borderlands', 'theview', 'za', 'everybodyelse'];
@@ -136,6 +139,7 @@ const group = new Group();
 projects.forEach((p, i) => {
 	const geometry = new SphereGeometry(GLOBE_RADIUS, 3, 2, longitudes[i] * 2 * Math.PI / N_TILES[0], 2 * Math.PI / N_TILES[0], latitudes[i] * Math.PI / N_TILES[1], Math.PI / N_TILES[1]);
 	const sphere = new Mesh(geometry, materials[i]);
+	sphere.name = p;
 	group.add(sphere);
 });
 globalGroup.add(group);
@@ -166,6 +170,13 @@ const interactionManager = new InteractionManager(
 	glRenderer.domElement
 );
 
+const overlay = document.getElementById('overlay');
+const close = document.getElementById('close');
+close.onclick = (e) => {
+	overlay.classList = '';
+};
+const content = document.getElementById('content');
+
 // add hover + click actions for every project image
 const SCALE = 1.05;
 const SCALE_INC = .005;
@@ -173,7 +184,7 @@ const SCALE_INC = .005;
 group.children.forEach((p) => {
 	interactionManager.add(p);
 	p.addEventListener('mouseover', (e) => {
-		e.target.scale.setScalar(SCALE);
+		// e.target.scale.setScalar(SCALE);
 		glRenderer.domElement.style.cursor = 'pointer';
 	});
 	p.addEventListener('mouseout', (e) => {
@@ -185,15 +196,12 @@ group.children.forEach((p) => {
 		const phi = -Math.PI / 2 + scaled.geometry.parameters.phiStart + Math.PI / N_TILES[0]; // left/right
 		const theta = scaled.geometry.parameters.thetaStart + Math.PI / (2 * N_TILES[1]); // top/down
 		const dist = 1.3 * GLOBE_RADIUS;
+
 		const focus = new Vector3(dist * Math.sin(theta) * Math.sin(phi), dist * Math.cos(theta), dist * Math.sin(theta) * Math.cos(phi));
-		// FIXME up is different
-		const up = new Vector3(0, 1, 0);
-		// const up = camera.position.clone();
-		// const phi2 = phi + Math.PI * 2;
-		// up.cross(new Vector3(dist * Math.sin(theta) * Math.sin(phi2), dist * Math.cos(theta), dist * Math.sin(theta) * Math.cos(phi2)));
-		// camera.up = up;
 		focus.applyEuler(globalGroup.rotation);
 		focus.applyEuler(scene.rotation);
+
+		const up = new Vector3(0, 1, 0);
 		up.applyEuler(globalGroup.rotation);
 		up.applyEuler(scene.rotation);
 
@@ -201,8 +209,17 @@ group.children.forEach((p) => {
 		const easing = TWEEN.Easing.Circular.InOut;
 		const easeTime = 2000;
 		// camera.position.copy(focus);
-		new TWEEN.Tween(camera.position).to(focus, easeTime).easing(easing).start();
-		new TWEEN.Tween(camera.up).to(up, easeTime).easing(easing).start();
+		if (false) {
+			// move position directly through space (potentially through the globe itself)
+			new TWEEN.Tween(camera.position).to(focus, easeTime).easing(easing).start();
+		} else {
+			// TODO move rotation and distance, guaranteeing a movement *around* the globe
+			new TWEEN.Tween(camera.position).to(focus, easeTime).easing(easing).start();
+		}
+		content.src = "https://about.thiswasyouridea.com/" + scaled.name;
+		new TWEEN.Tween(camera.up).to(up, easeTime).easing(easing).start().onComplete((e) => {
+			overlay.classList = 'visible';
+		});
 	})
 });
 
@@ -234,7 +251,7 @@ function animate() {
 	// offset is 0 at tbControls.minDistance, -.2 (20% to the right) at 1000
 	const dist = camera.position.length()
 	camera.setViewOffset(window.innerWidth, window.innerHeight, -window.innerWidth * Math.log(1 + dist - controls.minDistance) / 25, 0, window.innerWidth, window.innerHeight);
-	bloomPass.strength = Math.min(2, .1 + (dist - controls.minDistance) / 1000);
+	bloomPass.strength = Math.min(.5, .1 + (dist - controls.minDistance) / 1000);
 
 	TWEEN.update();
 

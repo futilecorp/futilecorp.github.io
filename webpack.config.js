@@ -1,12 +1,21 @@
 // const paths = require('./paths');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const {CleanWebpackPlugin} = require('clean-webpack-plugin');
+const ThreeMinifierPlugin = require("@yushijinhun/three-minifier-webpack");
+const threeMinifier = new ThreeMinifierPlugin();
 
 module.exports = {
-	plugins: [new CleanWebpackPlugin(), new HtmlWebpackPlugin()],
+	plugins: [
+		threeMinifier,
+		new HtmlWebpackPlugin()
+	],
+	resolve: {
+		plugins: [
+			threeMinifier.resolver
+		]
+	},
 	output: {
-		// path: paths.build,
-		// publicPath: 'public'
+		clean: true
+		// publicPath: 'public' // copy over assets from this directory
 	},
 	optimization: {
 		splitChunks: {
