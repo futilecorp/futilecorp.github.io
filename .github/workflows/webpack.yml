@@ -24,7 +24,8 @@ jobs:
 
     - name: Build
       run: |
-        npm install --force
+        npm install
+        echo "NODE_ENV=production" >> $GITHUB_ENV
         npx webpack
 
     - name: Upload GitHub Pages Artifact
