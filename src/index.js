@@ -227,6 +227,24 @@ window.addEventListener('click', (e) => {
 	untouched = false;
 });
 
+var mouseDown = false;
+var mousePos = [0, 0];
+document.addEventListener('mousedown', (e) => {
+	mouseDown = true;
+	mousePos = [e.offsetX, e.offsetY];
+});
+document.addEventListener('mouseup', (e) => {
+	mouseDown = false;
+});
+document.addEventListener('mousemove', (e) => {
+	if (mouseDown) {
+		const polar = graticulesObj.rotation.x + camera.position.z * (e.offsetY - mousePos[1]) / 80000;
+		graticulesObj.rotation.x = Math.min(Math.PI / 4, Math.max(polar, -Math.PI / 4));
+		graticulesObj.rotation.y += camera.position.z * (e.offsetX - mousePos[0]) / 80000;
+		mousePos = [e.offsetX, e.offsetY];
+	}
+});
+
 function animate() {
 	requestAnimationFrame(animate);
 	interactionManager.update();
