@@ -1,4 +1,5 @@
 import {
+	AxesHelper,
 	Scene,
 	PerspectiveCamera,
 	OrthographicCamera,
@@ -20,8 +21,6 @@ import {
 import {CSS2DRenderer} from 'three/addons/renderers/CSS2DRenderer.js';
 import {InteractionManager} from 'three.interactive';
 
-import {TrackballControls} from 'three/examples/jsm/controls/TrackballControls'
-import {ArcballControls} from 'three/addons/controls/ArcballControls.js';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -44,20 +43,18 @@ const camera = new PerspectiveCamera();
 // const camera = new OrthographicCamera();
 camera.position.set(0, 0, 1000);
 
-const controls = new TrackballControls(camera, glRenderer.domElement);
-controls.noPan = true;
-controls.minDistance = 130;
-controls.maxDistance = 45000;
-controls.rotateSpeed = 3;
-controls.zoomSpeed = 0.8;
-
-// const controls = new ArcballControls(camera, glRenderer.domElement, scene);
-// controls.setGizmosVisible(false);
-// controls.enablePan = false;
+// common properties
 // controls.minDistance = 130;
 // controls.maxDistance = 45000;
 
-camera.far = controls.maxDistance + 1;
+const zoomCamera = (diff) => {
+	const newPosition = camera.position.z * (1 + diff);
+	camera.position.z = Math.min(camera.far, Math.max(GLOBE_RADIUS * 1.2, newPosition));
+};
+window.addEventListener('wheel', (e) => {
+	zoomCamera(e.deltaY / 500);
+});
+// TODO implement pinching https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures
 
 // move globe slightly off center (20% to the right)
 // camera.setViewOffset(window.innerWidth, window.innerHeight, -.2 * window.innerWidth, 0, window.innerWidth, window.innerHeight);
@@ -70,27 +67,30 @@ camera.far = controls.maxDistance + 1;
 scene.add(new AmbientLight(0xbbbbbb));
 scene.add(new DirectionalLight(0xffffff, 0.6));
 
-const globalGroup = new Group();
-// globalGroup.order = "ZYX";
-scene.rotateY(1.8);
-scene.rotateZ(.5);
-scene.add(globalGroup);
-
 // GLOBE
 const N_TILES = [24, 18]; // long, lat
 const USABLE_LATITUDES = 10; // don't use top/bottom 3
 const tileWidth = 360 / N_TILES[0];
 const tileHeight = 180 / N_TILES[1];
 const GLOBE_RADIUS = 100;
+camera.far = 100 * GLOBE_RADIUS;
 
 const graticuleGen = graticule();
 graticuleGen.stepMajor([90, 360]);
 graticuleGen.stepMinor([tileWidth, tileHeight]);
 const graticulesObj = new LineSegments(
 	new GeoJsonGeometry(graticuleGen(), GLOBE_RADIUS, 2),
-	new LineBasicMaterial({transparent: true, opacity: 0.4})
+	new LineBasicMaterial({
+		opacity: 0.4,
+		linewidth: 2,
+		transparent: true,
+	})
 );
-globalGroup.add(graticulesObj);
+graticulesObj.rotation.order = 'ZXY';
+graticulesObj.rotation.z = -.5; // tilt to side
+// graticulesObj.rotation.x = -.3; // tilt slightly to back
+scene.add(graticulesObj);
+// camera.up.applyAxisAngle(new Vector3(1, 0, 0), Math.PI / 4);
 
 // GLOBE BLOOM
 const renderScene = new RenderPass(scene, camera);
@@ -100,7 +100,7 @@ bloomPass.radius = .001;
 
 const composer = new EffectComposer(glRenderer);
 composer.addPass(renderScene);
-composer.addPass(bloomPass);
+// composer.addPass(bloomPass);
 
 const onResize = () => {
 	var width = window.innerWidth;
@@ -110,7 +110,7 @@ const onResize = () => {
 	camera.updateProjectionMatrix();
 	glRenderer.setSize(width, height);
 	composer.setSize(width, height);
-	controls.handleResize();
+	// controls.handleResize();
 };
 window.addEventListener('resize', onResize);
 onResize();
@@ -134,15 +134,16 @@ projects.forEach((p, i) => {
 const latitudes = projects.map(() => (N_TILES[1] - USABLE_LATITUDES) / 2 + Math.floor(Math.random() * USABLE_LATITUDES));
 
 
-const group = new Group();
 // horizontal, then vertical
 projects.forEach((p, i) => {
 	const geometry = new SphereGeometry(GLOBE_RADIUS, 3, 2, longitudes[i] * 2 * Math.PI / N_TILES[0], 2 * Math.PI / N_TILES[0], latitudes[i] * Math.PI / N_TILES[1], Math.PI / N_TILES[1]);
 	const sphere = new Mesh(geometry, materials[i]);
 	sphere.name = p;
-	group.add(sphere);
+	graticulesObj.add(sphere);
 });
-globalGroup.add(group);
+
+// const axesHelper = new AxesHelper(5);
+// scene.add(axesHelper);
 
 // function Element(id, x, y, z, ry) {
 
@@ -181,7 +182,7 @@ const content = document.getElementById('content');
 const SCALE = 1.05;
 const SCALE_INC = .005;
 
-group.children.forEach((p) => {
+graticulesObj.children.forEach((p) => {
 	interactionManager.add(p);
 	p.addEventListener('mouseover', (e) => {
 		// e.target.scale.setScalar(SCALE);
@@ -193,33 +194,20 @@ group.children.forEach((p) => {
 	});
 	p.addEventListener('click', (e) => {
 		const scaled = e.target;
-		const phi = -Math.PI / 2 + scaled.geometry.parameters.phiStart + Math.PI / N_TILES[0]; // left/right
-		const theta = scaled.geometry.parameters.thetaStart + Math.PI / (2 * N_TILES[1]); // top/down
-		const dist = 1.3 * GLOBE_RADIUS;
-
-		const focus = new Vector3(dist * Math.sin(theta) * Math.sin(phi), dist * Math.cos(theta), dist * Math.sin(theta) * Math.cos(phi));
-		focus.applyEuler(globalGroup.rotation);
-		focus.applyEuler(scene.rotation);
-
-		const up = new Vector3(0, 1, 0);
-		up.applyEuler(globalGroup.rotation);
-		up.applyEuler(scene.rotation);
+		let phi = Math.PI / 2 - scaled.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
+		const theta = Math.PI / 2 - scaled.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
 
 		// const easing = TWEEN.Easing.Back.In;
 		const easing = TWEEN.Easing.Circular.InOut;
 		const easeTime = 2000;
-		// camera.position.copy(focus);
-		if (false) {
-			// move position directly through space (potentially through the globe itself)
-			new TWEEN.Tween(camera.position).to(focus, easeTime).easing(easing).start();
-		} else {
-			// TODO move rotation and distance, guaranteeing a movement *around* the globe
-			new TWEEN.Tween(camera.position).to(focus, easeTime).easing(easing).start();
+		if (Math.abs(phi - graticulesObj.rotation.y) > Math.PI / 2) {
+			phi = phi - Math.sign(phi - graticulesObj.rotation.y) * 2 * Math.PI;
 		}
-		content.src = "https://about.thiswasyouridea.com/" + scaled.name;
-		new TWEEN.Tween(camera.up).to(up, easeTime).easing(easing).start().onComplete((e) => {
+		new TWEEN.Tween(graticulesObj.rotation).to({x: theta, y: phi, z: 0}, easeTime).easing(easing).start().onComplete((e) => {
 			overlay.classList = 'visible';
 		});
+		new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(easing).start();
+		content.src = "https://about.thiswasyouridea.com/" + scaled.name;
 	})
 });
 
@@ -235,7 +223,7 @@ document.getElementById('darkmode').addEventListener('click', (e) => {
 });
 
 var untouched = true;
-controls.addEventListener('change', (e) => {
+window.addEventListener('click', (e) => {
 	untouched = false;
 });
 
@@ -243,15 +231,14 @@ function animate() {
 	requestAnimationFrame(animate);
 	interactionManager.update();
 	if (untouched) {
-		globalGroup.rotation.y += .01;
+		graticulesObj.rotation.y += .01;
 		// globalGroup.rotation.x += .01;
 	}
-	controls.update();
 	// camera position has been updated based on zooming, apply updated center shift based on it
 	// offset is 0 at tbControls.minDistance, -.2 (20% to the right) at 1000
 	const dist = camera.position.length()
-	camera.setViewOffset(window.innerWidth, window.innerHeight, -window.innerWidth * Math.log(1 + dist - controls.minDistance) / 25, 0, window.innerWidth, window.innerHeight);
-	bloomPass.strength = Math.min(.5, .1 + (dist - controls.minDistance) / 1000);
+	// camera.setViewOffset(window.innerWidth, window.innerHeight, -window.innerWidth * Math.log(1 + dist - controls.minDistance) / 25, 0, window.innerWidth, window.innerHeight);
+	// bloomPass.strength = Math.min(.5, .1 + (dist - controls.minDistance) / 1000);
 
 	TWEEN.update();
 
