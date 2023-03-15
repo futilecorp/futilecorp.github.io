@@ -45,7 +45,7 @@ jobs:
         npx webpack
 
     - name: Move static pages into place
-      run: mv _site/* dist/
+      run: cp -R _site/* dist/
 
     - name: Upload GitHub Pages Artifact
       id: upload

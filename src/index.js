@@ -171,10 +171,14 @@ const interactionManager = new InteractionManager(
 	glRenderer.domElement
 );
 
+// const easing = TWEEN.Easing.Back.In;
+const easing = TWEEN.Easing.Circular.InOut;
+const easeTime = 2000;
 const overlay = document.getElementById('overlay');
 const close = document.getElementById('close');
 close.onclick = (e) => {
 	overlay.classList = '';
+	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.7}, easeTime).easing(easing).start();
 };
 const content = document.getElementById('content');
 
@@ -197,9 +201,6 @@ graticulesObj.children.forEach((p) => {
 		let phi = Math.PI / 2 - scaled.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
 		const theta = Math.PI / 2 - scaled.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
 
-		// const easing = TWEEN.Easing.Back.In;
-		const easing = TWEEN.Easing.Circular.InOut;
-		const easeTime = 2000;
 		if (Math.abs(phi - graticulesObj.rotation.y) > Math.PI / 2) {
 			phi = phi - Math.sign(phi - graticulesObj.rotation.y) * 2 * Math.PI;
 		}
@@ -207,7 +208,9 @@ graticulesObj.children.forEach((p) => {
 			overlay.classList = 'visible';
 		});
 		new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(easing).start();
-		content.src = "https://about.thiswasyouridea.com/" + scaled.name;
+		// content.srcdoc = "<h1>" + scaled.name + "</h1>";
+		// content.src = "https://about.thiswasyouridea.com/" + scaled.name;
+		content.src = "https://futilecorp.github.io/" + scaled.name;
 	})
 });
 
@@ -249,8 +252,7 @@ function animate() {
 	requestAnimationFrame(animate);
 	interactionManager.update();
 	if (untouched) {
-		graticulesObj.rotation.y += .01;
-		// globalGroup.rotation.x += .01;
+		graticulesObj.rotation.y += .004;
 	}
 	// camera position has been updated based on zooming, apply updated center shift based on it
 	// offset is 0 at tbControls.minDistance, -.2 (20% to the right) at 1000
