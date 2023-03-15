@@ -31,7 +31,7 @@ jobs:
         gem_src: 'static'
         jekyll_src: 'static'
         build_only: true
-        build_dir: '_site/'
+        build_dir: '../_site/'
 
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
