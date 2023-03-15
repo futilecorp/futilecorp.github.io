@@ -201,16 +201,14 @@ graticulesObj.children.forEach((p) => {
 		let phi = Math.PI / 2 - scaled.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
 		const theta = Math.PI / 2 - scaled.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
 
-		if (Math.abs(phi - graticulesObj.rotation.y) > Math.PI / 2) {
-			phi = phi - Math.sign(phi - graticulesObj.rotation.y) * 2 * Math.PI;
-		}
-		new TWEEN.Tween(graticulesObj.rotation).to({x: theta, y: phi, z: 0}, easeTime).easing(easing).start().onComplete((e) => {
+		const diff = phi - (graticulesObj.rotation.y) % (2 * Math.PI);
+		new TWEEN.Tween(graticulesObj.rotation).to({x: theta, y: graticulesObj.rotation.y + diff, z: 0}, easeTime).easing(easing).start().onComplete((e) => {
 			overlay.classList = 'visible';
 		});
-		new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(easing).start();
+		new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(TWEEN.Easing.Back.In).start();
 		// content.srcdoc = "<h1>" + scaled.name + "</h1>";
 		// content.src = "https://about.thiswasyouridea.com/" + scaled.name;
-		content.src = "https://futilecorp.github.io/" + scaled.name;
+		content.src = "https://futilecorp.github.io/static/" + scaled.name;
 	})
 });
 

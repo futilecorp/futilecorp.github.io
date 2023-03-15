@@ -17,22 +17,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    # Use GitHub Actions' cache to shorten build times and decrease load on servers
-    - uses: actions/cache@v2
-      with:
-        path: vendor/bundle
-        key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile') }}
-        restore-keys: |
-          ${{ runner.os }}-gems-
-
-    - name: Build static pages with Jekyll
-      uses: helaili/jekyll-action@v2
-      with:
-        gem_src: 'static'
-        jekyll_src: 'static'
-        build_only: true
-        build_dir: '../_site/'
-
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
@@ -43,9 +27,6 @@ jobs:
         npm install
         echo "mode=production" >> $GITHUB_ENV
         npx webpack
-
-    - name: Move static pages into place
-      run: cp -R _site/* dist/
 
     - name: Upload GitHub Pages Artifact
       id: upload

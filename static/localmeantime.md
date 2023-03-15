@@ -1,6 +1,0 @@
----
-title: local mean time
----
-Modern standardised time, synchronised across international timezones, dictates the daily rhythms of millions of people. An invention of the industrial age (originally made necessary for railway logistics), standardised time in the information age facilitates the long-distance transportation of goods and people, as well as international telecommunication which connects people primarily based on their profession and occupation. This long-distance synchronisation operates at the expense of a sense of local community, eating away at the local meaning of time as giving structure to a local, situated social rhythm.
-
-*local mean time* thinks the social and spatial individualisation of time to its logical conclusion. Three digital clocks are set up along a straight line that runs East-West through the PSK Kassenhalle, a representational space that embodies the reason and rationality which gave us, amongst other things, standardised time. All clocks seem to display the same current time of day in hexadecimal format, but each one is actually tuned to the precise *local mean time* for its longitude. This way, the clocks reveal just noticeable differences in when their digits flip over, which are grounded in their actual position in space.
