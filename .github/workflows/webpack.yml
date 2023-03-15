@@ -28,6 +28,7 @@ jobs:
     - name: Build static pages with Jekyll
       uses: helaili/jekyll-action@v2
       with:
+        gem_src: 'static'
         jekyll_src: 'static'
         build_only: true
 
