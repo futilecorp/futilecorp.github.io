@@ -44,13 +44,15 @@ const scene = new Scene();
 const camera = new PerspectiveCamera();
 camera.position.set(0, 0, GLOBE_RADIUS * 7);
 
+const setTilt = () => {
+	graticulesObj.rotation.z = - Math.max(0, (camera.position.z - 2 * GLOBE_RADIUS) / 700); // tilt to side
+};
+
 const zoomCamera = (diff) => {
 	const newPosition = camera.position.z * (1 + diff);
 	camera.position.z = Math.min(camera.far, Math.max(GLOBE_RADIUS * 1.2, newPosition));
-	// camera.position.x = newPosition / -2;
-	// graticulesObj.rotation.x = 0;
-	// graticulesObj.rotation.z = 0;
-	// graticulesObj.rotation.z = - Math.min(.7, Math.max(0, graticulesObj.rotation.z + diff / 100)); // tilt to side
+	// graticulesObj.position.x = ((camera.position.z - GLOBE_RADIUS * 1.2) / 100) ** 1.5;
+	setTilt();
 };
 glRenderer.domElement.addEventListener('wheel', (e) => {
 	e.preventDefault();
@@ -70,15 +72,16 @@ scene.add(new AmbientLight(0xbbbbbb));
 scene.add(new DirectionalLight(0xffffff, 0.6));
 
 // GLOBE
-const N_TILES = [24, 18]; // long, lat
-const USABLE_LATITUDES = 8; // don't use top/bottom 4
+const N_TILES = [16, 12]; // long, lat
+const USABLE_LATITUDES = 6; // don't use top/bottom 4
 const tileWidth = 360 / N_TILES[0];
 const tileHeight = 180 / N_TILES[1];
-camera.far = 100 * GLOBE_RADIUS;
+camera.far = 400 * GLOBE_RADIUS;
 
 const graticuleGen = graticule();
 graticuleGen.stepMajor([90, 360]);
 graticuleGen.stepMinor([tileWidth, tileHeight]);
+graticuleGen.extentMinor([[-180, -90 + tileHeight], [180, 90 - tileHeight + .01]]);
 const graticulesObj = new LineSegments(
 	new GeoJsonGeometry(graticuleGen(), GLOBE_RADIUS, 2),
 	new LineBasicMaterial({
@@ -90,8 +93,8 @@ const graticulesObj = new LineSegments(
 graticulesObj.rotation.order = 'ZXY';
 graticulesObj.rotation.z = -.7; // tilt to side
 graticulesObj.rotation.x = .7; // tilt slightly to front
+setTilt();
 scene.add(graticulesObj);
-// camera.up.applyAxisAngle(new Vector3(1, 0, 0), Math.PI / 4);
 
 // GLOBE BLOOM
 const renderScene = new RenderPass(scene, camera);
@@ -129,11 +132,12 @@ const materials = projects.map((s) =>
 	}),
 );
 const longitudes = [0];
+const latitudes = [N_TILES[1] / 2];
 projects.forEach((p, i) => {
 	longitudes.push(longitudes[i] + 1 + Math.floor(Math.random() * 4));
+	latitudes.push((N_TILES[1] - USABLE_LATITUDES) / 2 + (latitudes[i] + 1 + Math.floor(Math.random() * USABLE_LATITUDES)) % USABLE_LATITUDES);
+	// tileHeight * (N_TILES[1] - USABLE_LATITUDES)/2
 });
-const latitudes = projects.map(() => (N_TILES[1] - USABLE_LATITUDES) / 2 + Math.floor(Math.random() * USABLE_LATITUDES));
-
 
 // horizontal, then vertical
 projects.forEach((p, i) => {
@@ -173,13 +177,15 @@ const interactionManager = new InteractionManager(
 );
 
 // const easing = TWEEN.Easing.Back.In;
-const easing = TWEEN.Easing.Circular.InOut;
-const easeTime = 2000;
+const easing = TWEEN.Easing.Quartic.InOut;
 const title = document.title;
 const header = document.getElementById('title');
 const setTitle = (t) => {
-	document.title = t;
 	header.textContent = t;
+	if (t != title) {
+		t += ' | the Futile Corporation';
+	}
+	document.title = t;
 };
 const overlay = document.getElementById('overlay');
 const content = document.getElementById('content');
@@ -187,52 +193,53 @@ const close = document.getElementById('close');
 close.onclick = (e) => {
 	overlay.classList = '';
 	setTitle(title);
-	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.7}, easeTime).easing(easing).start();
+	document.location.hash = '';
+	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.7}, 1000).easing(TWEEN.Easing.Quartic.Out).start();
 	content.replaceChildren();
 };
 close.ontouchend = close.onclick;
 
-// add hover + click actions for every project image
-const SCALE = 1.05;
-const SCALE_INC = .005;
+const easeTime = 1500;
 
+// add hover + click actions for every project image
+const zoomScale = 1.05;
 graticulesObj.children.forEach((p) => {
 	interactionManager.add(p);
 	p.addEventListener('mouseover', (e) => {
-		// e.target.scale.setScalar(SCALE);
 		glRenderer.domElement.style.cursor = 'pointer';
+		new TWEEN.Tween(e.target.scale).to({x: zoomScale, y: zoomScale, z: zoomScale}, 200).easing(TWEEN.Easing.Linear.None).start();
 	});
 	p.addEventListener('mouseout', (e) => {
-		e.target.scale.setScalar(1);
+		new TWEEN.Tween(e.target.scale).to({x: 1, y: 1, z: 1}, 100).easing(TWEEN.Easing.Linear.None).start();
 		glRenderer.domElement.style.cursor = 'initial';
 	});
 	p.addEventListener('click', (e) => {
+		untouched = false;
 		const scaled = e.target;
 		let phi = Math.PI / 2 - scaled.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
 		const theta = Math.PI / 2 - scaled.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
-
 		const diff = phi - (graticulesObj.rotation.y) % (2 * Math.PI);
-		new TWEEN.Tween(graticulesObj.rotation).to({x: theta, y: graticulesObj.rotation.y + diff, z: 0}, easeTime).easing(easing).start().onComplete((e) => {
-			overlay.classList = 'visible';
-		});
-		new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(TWEEN.Easing.Back.In).start();
+
 		const xhr = new XMLHttpRequest;
 		xhr.open('GET', '/static/' + scaled.name + '/');
 		xhr.responseType = 'document';
 		xhr.onload = () => {
 			if (xhr.readyState === xhr.DONE && xhr.status === 200) {
 				content.replaceChildren(...xhr.response.getElementById('content').childNodes);
-				setTitle(xhr.response.title);
+				content.dataset.title = xhr.response.title;
+				processContent();
 			}
 		};
-
 		xhr.send();
-		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/responseXML
-		//
-		// content.src = "https://futilecorp.github.io/static/" + scaled.name;
-		// content.addEventListener('load', (e) => {
-		// 	// console.log(e.target.contentDocument);
-		// });
+		document.location.hash = scaled.name;
+
+		new TWEEN.Tween(graticulesObj.rotation).to({x: theta, y: graticulesObj.rotation.y + diff, z: 0}, easeTime).easing(easing).start().onComplete((e) => {
+			overlay.classList = 'visible';
+			if (content.hasChildNodes()) {
+				setTitle(content.dataset.title);
+			}
+		});
+		new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(TWEEN.Easing.Back.In).start();
 	});
 });
 
@@ -244,6 +251,7 @@ setColors();
 document.getElementById('darkmode').checked = darkMode;
 document.getElementById('darkmode').addEventListener('click', (e) => {
 	darkMode = e.target.checked;
+	document.body.classList = darkMode ? '' : 'light';
 	setColors();
 });
 
@@ -252,12 +260,10 @@ var mouseDown = false;
 
 var mousePos = [0, 0];
 glRenderer.domElement.addEventListener('mousedown', (e) => {
-	untouched = false;
 	mouseDown = true;
 	mousePos = [e.offsetX, e.offsetY];
 });
 glRenderer.domElement.addEventListener('touchstart', (e) => {
-	untouched = false;
 	mouseDown = true;
 	mousePos = [e.touches[0].clientX, e.touches[0].clientY];
 });
@@ -270,14 +276,16 @@ glRenderer.domElement.addEventListener('touchend', (e) => {
 });
 glRenderer.domElement.addEventListener('mousemove', (e) => {
 	if (mouseDown) {
+		untouched = false;
 		const polar = graticulesObj.rotation.x + camera.position.z * (e.offsetY - mousePos[1]) / 80000;
-		graticulesObj.rotation.x = Math.min(Math.PI / 4, Math.max(polar, -Math.PI / 4));
+		graticulesObj.rotation.x = Math.min(Math.PI / 3, Math.max(polar, -Math.PI / 3));
 		graticulesObj.rotation.y += camera.position.z * (e.offsetX - mousePos[0]) / 80000;
 		mousePos = [e.offsetX, e.offsetY];
 	}
 });
 glRenderer.domElement.addEventListener('touchmove', (e) => {
 	if (mouseDown) {
+		untouched = false;
 		const polar = graticulesObj.rotation.x + camera.position.z * (e.touches[0].clientY - mousePos[1]) / 80000;
 		graticulesObj.rotation.x = Math.min(Math.PI / 4, Math.max(polar, -Math.PI / 4));
 		graticulesObj.rotation.y += camera.position.z * (e.touches[0].clientX - mousePos[0]) / 80000;
@@ -291,12 +299,6 @@ function animate() {
 	if (untouched) {
 		graticulesObj.rotation.y += .004;
 	}
-	// camera position has been updated based on zooming, apply updated center shift based on it
-	// offset is 0 at tbControls.minDistance, -.2 (20% to the right) at 1000
-	const dist = camera.position.length()
-	// camera.setViewOffset(window.innerWidth, window.innerHeight, -window.innerWidth * Math.log(1 + dist - controls.minDistance) / 25, 0, window.innerWidth, window.innerHeight);
-	// bloomPass.strength = Math.min(.5, .1 + (dist - controls.minDistance) / 1000);
-
 	TWEEN.update();
 
 	if (darkMode) {

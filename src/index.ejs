@@ -5,7 +5,7 @@
 		<link href="/static/style.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;500&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   </head>
   <body>
 		<div id="title">the Futile Corporation</div>
@@ -15,4 +15,22 @@
 			<div id="content"></div>
 		</div>
 	</body>
+<script type="text/javascript">
+const processContent = () => {
+const readmore = document.getElementById('readmore');
+	if (!readmore) {
+		return;
+	}
+	console.log('doingit');
+const remainder = document.getElementById('remainder');
+readmore.children[0].onclick = (e) => {
+	readmore.style.display = 'none';
+	remainder.style.display = 'block';
+};
+readmore.style.display = 'block';
+remainder.style.display = 'none';
+const lightbox = GLightbox();
+}
+processContent();
+</script>
 </html>
