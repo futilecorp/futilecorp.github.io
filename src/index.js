@@ -38,20 +38,22 @@ glRenderer.domElement.style.zIndex = 1;
 glRenderer.domElement.style.top = 0;
 // glRenderer.domElement.style.pointerEvents = 'none';
 
+const GLOBE_RADIUS = 100;
+
 const scene = new Scene();
 const camera = new PerspectiveCamera();
-// const camera = new OrthographicCamera();
-camera.position.set(0, 0, 1000);
-
-// common properties
-// controls.minDistance = 130;
-// controls.maxDistance = 45000;
+camera.position.set(0, 0, GLOBE_RADIUS * 7);
 
 const zoomCamera = (diff) => {
 	const newPosition = camera.position.z * (1 + diff);
 	camera.position.z = Math.min(camera.far, Math.max(GLOBE_RADIUS * 1.2, newPosition));
+	// camera.position.x = newPosition / -2;
+	// graticulesObj.rotation.x = 0;
+	// graticulesObj.rotation.z = 0;
+	// graticulesObj.rotation.z = - Math.min(.7, Math.max(0, graticulesObj.rotation.z + diff / 100)); // tilt to side
 };
-window.addEventListener('wheel', (e) => {
+glRenderer.domElement.addEventListener('wheel', (e) => {
+	e.preventDefault();
 	zoomCamera(e.deltaY / 500);
 });
 // TODO implement pinching https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures
@@ -69,10 +71,9 @@ scene.add(new DirectionalLight(0xffffff, 0.6));
 
 // GLOBE
 const N_TILES = [24, 18]; // long, lat
-const USABLE_LATITUDES = 10; // don't use top/bottom 3
+const USABLE_LATITUDES = 8; // don't use top/bottom 4
 const tileWidth = 360 / N_TILES[0];
 const tileHeight = 180 / N_TILES[1];
-const GLOBE_RADIUS = 100;
 camera.far = 100 * GLOBE_RADIUS;
 
 const graticuleGen = graticule();
@@ -87,8 +88,8 @@ const graticulesObj = new LineSegments(
 	})
 );
 graticulesObj.rotation.order = 'ZXY';
-graticulesObj.rotation.z = -.5; // tilt to side
-// graticulesObj.rotation.x = -.3; // tilt slightly to back
+graticulesObj.rotation.z = -.7; // tilt to side
+graticulesObj.rotation.x = .7; // tilt slightly to front
 scene.add(graticulesObj);
 // camera.up.applyAxisAngle(new Vector3(1, 0, 0), Math.PI / 4);
 
@@ -118,7 +119,7 @@ onResize();
 
 // PROJECT IMAGES
 const textureLoader = new TextureLoader();
-const projects = ['everythingisinterestingonce', 'landuse', 'borderlands', 'theview', 'za', 'everybodyelse'];
+const projects = ['localmeantime', 'everythingisinterestingonce', 'landuse', 'borderlands', 'theview', 'za', 'everybodyelse'];
 const materials = projects.map((s) =>
 	new MeshPhongMaterial({
 		map: textureLoader.load(
@@ -174,13 +175,22 @@ const interactionManager = new InteractionManager(
 // const easing = TWEEN.Easing.Back.In;
 const easing = TWEEN.Easing.Circular.InOut;
 const easeTime = 2000;
+const title = document.title;
+const header = document.getElementById('title');
+const setTitle = (t) => {
+	document.title = t;
+	header.textContent = t;
+};
 const overlay = document.getElementById('overlay');
+const content = document.getElementById('content');
 const close = document.getElementById('close');
 close.onclick = (e) => {
 	overlay.classList = '';
+	setTitle(title);
 	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.7}, easeTime).easing(easing).start();
+	content.replaceChildren();
 };
-const content = document.getElementById('content');
+close.ontouchend = close.onclick;
 
 // add hover + click actions for every project image
 const SCALE = 1.05;
@@ -206,10 +216,24 @@ graticulesObj.children.forEach((p) => {
 			overlay.classList = 'visible';
 		});
 		new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(TWEEN.Easing.Back.In).start();
-		// content.srcdoc = "<h1>" + scaled.name + "</h1>";
-		// content.src = "https://about.thiswasyouridea.com/" + scaled.name;
-		content.src = "https://futilecorp.github.io/static/" + scaled.name;
-	})
+		const xhr = new XMLHttpRequest;
+		xhr.open('GET', '/static/' + scaled.name + '/');
+		xhr.responseType = 'document';
+		xhr.onload = () => {
+			if (xhr.readyState === xhr.DONE && xhr.status === 200) {
+				content.replaceChildren(...xhr.response.getElementById('content').childNodes);
+				setTitle(xhr.response.title);
+			}
+		};
+
+		xhr.send();
+		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/responseXML
+		//
+		// content.src = "https://futilecorp.github.io/static/" + scaled.name;
+		// content.addEventListener('load', (e) => {
+		// 	// console.log(e.target.contentDocument);
+		// });
+	});
 });
 
 const setColors = () => {
@@ -224,25 +248,40 @@ document.getElementById('darkmode').addEventListener('click', (e) => {
 });
 
 var untouched = true;
-window.addEventListener('click', (e) => {
-	untouched = false;
-});
-
 var mouseDown = false;
+
 var mousePos = [0, 0];
-document.addEventListener('mousedown', (e) => {
+glRenderer.domElement.addEventListener('mousedown', (e) => {
+	untouched = false;
 	mouseDown = true;
 	mousePos = [e.offsetX, e.offsetY];
 });
-document.addEventListener('mouseup', (e) => {
+glRenderer.domElement.addEventListener('touchstart', (e) => {
+	untouched = false;
+	mouseDown = true;
+	mousePos = [e.touches[0].clientX, e.touches[0].clientY];
+});
+
+glRenderer.domElement.addEventListener('mouseup', (e) => {
 	mouseDown = false;
 });
-document.addEventListener('mousemove', (e) => {
+glRenderer.domElement.addEventListener('touchend', (e) => {
+	mouseDown = false;
+});
+glRenderer.domElement.addEventListener('mousemove', (e) => {
 	if (mouseDown) {
 		const polar = graticulesObj.rotation.x + camera.position.z * (e.offsetY - mousePos[1]) / 80000;
 		graticulesObj.rotation.x = Math.min(Math.PI / 4, Math.max(polar, -Math.PI / 4));
 		graticulesObj.rotation.y += camera.position.z * (e.offsetX - mousePos[0]) / 80000;
 		mousePos = [e.offsetX, e.offsetY];
+	}
+});
+glRenderer.domElement.addEventListener('touchmove', (e) => {
+	if (mouseDown) {
+		const polar = graticulesObj.rotation.x + camera.position.z * (e.touches[0].clientY - mousePos[1]) / 80000;
+		graticulesObj.rotation.x = Math.min(Math.PI / 4, Math.max(polar, -Math.PI / 4));
+		graticulesObj.rotation.y += camera.position.z * (e.touches[0].clientX - mousePos[0]) / 80000;
+		mousePos = [e.touches[0].clientX, e.touches[0].clientY];
 	}
 });
 

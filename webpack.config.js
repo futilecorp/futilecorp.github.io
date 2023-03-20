@@ -22,4 +22,20 @@ module.exports = {
 			chunks: 'all',
 		},
 	},
+	devServer: {
+		headers: {
+			'Cache-Control': 'no-store',
+		},
+		proxy: {
+			'/static':
+			{
+				// target: 'http://127.0.0.1:4000',
+				// pathRewrite: {'/static': ''},
+				target: 'https://futilecorp.github.io',
+				secure: false,
+				changeOrigin: true
+			}
+		}
+
+	}
 };
