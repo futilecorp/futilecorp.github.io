@@ -30,8 +30,10 @@ import {TWEEN} from 'three/examples/jsm/libs/tween.module.min'
 
 var darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-const glRenderer = new WebGLRenderer({alpha: true});
+const glRenderer = new WebGLRenderer({antialias: true});
 document.body.appendChild(glRenderer.domElement);
+glRenderer.setPixelRatio(window.devicePixelRatio);
+
 // overlay additional on top of main renderer
 glRenderer.domElement.style.position = 'absolute';
 glRenderer.domElement.style.zIndex = 1;
@@ -304,7 +306,7 @@ const pointermoveHandler = (e) => {
 		// Calculate the distance between the two pointers
 		const curDiff = Math.abs(pointerCache[0].clientX - pointerCache[1].clientX);
 		if (prevPinchDiff > 0) {
-			zoomCamera(curDiff - prevPinchDiff);
+			zoomCamera((prevPinchDiff - curDiff) / 10);
 			if (curDiff > prevPinchDiff) {
 				// The distance between the two pointers has increased
 				console.log("Pinch moving OUT -> Zoom in");
