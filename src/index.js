@@ -166,11 +166,10 @@ const interactionManager = new InteractionManager(
 
 // const easing = TWEEN.Easing.Back.In;
 const easing = TWEEN.Easing.Quartic.InOut;
-const title = document.title;
 const header = document.getElementById('title');
 const setTitle = (t) => {
 	header.textContent = t;
-	if (t != title) {
+	if (t != header.dataset.default) {
 		t += ' | the Futile Corporation';
 	}
 	document.title = t;
@@ -179,13 +178,15 @@ const overlay = document.getElementById('overlay');
 const content = document.getElementById('content');
 const close = document.getElementById('close');
 close.onclick = (e) => {
+	// console.log(e.type);
 	overlay.classList = '';
-	setTitle(title);
+	setTitle(header.dataset.default);
 	document.location.hash = '';
 	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.7}, 1000).easing(TWEEN.Easing.Quartic.Out).start();
 	content.replaceChildren();
 };
 close.ontouchend = close.onclick;
+close.onpointerup = close.onclick;
 
 const easeTime = 1500;
 
@@ -216,6 +217,8 @@ const selectProject = (e) => {
 	}
 	touchedProject = null;
 
+	// TODO disable focussing
+	focusOut(e);
 	const scaled = e.target;
 	let phi = Math.PI / 2 - scaled.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
 	const theta = Math.PI / 2 - scaled.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
@@ -227,7 +230,7 @@ const selectProject = (e) => {
 	xhr.onload = () => {
 		if (xhr.readyState === xhr.DONE && xhr.status === 200) {
 			content.replaceChildren(...xhr.response.getElementById('content').childNodes);
-			content.dataset.title = xhr.response.title;
+			content.dataset.title = xhr.response.getElementById('content').dataset.title;
 			window.history.replaceState(scaled.name, content.dataset.title, window.location.origin + '/' + scaled.name);
 			processContent();
 		}
@@ -301,6 +304,7 @@ const pointermoveHandler = (e) => {
 		// Calculate the distance between the two pointers
 		const curDiff = Math.abs(pointerCache[0].clientX - pointerCache[1].clientX);
 		if (prevPinchDiff > 0) {
+			zoomCamera(curDiff - prevPinchDiff);
 			if (curDiff > prevPinchDiff) {
 				// The distance between the two pointers has increased
 				console.log("Pinch moving OUT -> Zoom in");
