@@ -32,7 +32,7 @@ var darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: da
 
 const glRenderer = new WebGLRenderer({antialias: true});
 document.body.appendChild(glRenderer.domElement);
-glRenderer.setPixelRatio(window.devicePixelRatio);
+// glRenderer.setPixelRatio(window.devicePixelRatio);
 
 // overlay additional on top of main renderer
 glRenderer.domElement.style.position = 'absolute';
@@ -306,7 +306,7 @@ const pointermoveHandler = (e) => {
 		// Calculate the distance between the two pointers
 		const curDiff = Math.abs(pointerCache[0].clientX - pointerCache[1].clientX);
 		if (prevPinchDiff > 0) {
-			zoomCamera((prevPinchDiff - curDiff) / 10);
+			zoomCamera((prevPinchDiff - curDiff) / 30);
 			if (curDiff > prevPinchDiff) {
 				// The distance between the two pointers has increased
 				console.log("Pinch moving OUT -> Zoom in");
