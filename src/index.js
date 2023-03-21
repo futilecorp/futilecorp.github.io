@@ -1,6 +1,7 @@
 import {
 	AxesHelper,
 	Scene,
+	Color,
 	PerspectiveCamera,
 	OrthographicCamera,
 	WebGLRenderer,
@@ -97,8 +98,8 @@ composer.addPass(renderScene);
 // composer.addPass(bloomPass);
 
 const onResize = () => {
-	var width = window.innerWidth;
-	var height = window.innerHeight;
+	var width = window.innerWidth * window.devicePixelRatio;
+	var height = window.innerHeight * window.devicePixelRatio;
 	// cssRenderer.setSize(width, height);
 	camera.aspect = width / height;
 	camera.updateProjectionMatrix();
@@ -258,8 +259,10 @@ graticulesObj.children.forEach((p) => {
 });
 
 const setColors = () => {
-	glRenderer.setClearColor(darkMode ? 0x000000 : 0xffffff);
-	graticulesObj.material.color.set(darkMode ? 'white' : 'black');
+	// graticulesObj.material.color.set(darkMode ? 'white' : 'black');
+	new TWEEN.Tween(graticulesObj.material.color).to({r: darkMode ? 1 : 0, g: darkMode ? 1 : 0, b: darkMode ? 1 : 0}, 1000).easing(TWEEN.Easing.Linear.None).start().onUpdate((e) => {
+		glRenderer.setClearColor(new Color(1 - e.r, 1 - e.r, 1 - e.r));
+	});
 };
 setColors();
 document.getElementById('darkmode').checked = darkMode;
