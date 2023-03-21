@@ -18,7 +18,7 @@ import {
 	Vector3,
 	DoubleSide
 } from 'three';
-import {CSS2DRenderer} from 'three/addons/renderers/CSS2DRenderer.js';
+// import {CSS2DRenderer} from 'three/addons/renderers/CSS2DRenderer.js';
 import {InteractionManager} from 'three.interactive';
 
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
@@ -38,27 +38,15 @@ glRenderer.domElement.style.zIndex = 1;
 glRenderer.domElement.style.top = 0;
 // glRenderer.domElement.style.pointerEvents = 'none';
 
-const GLOBE_RADIUS = 100;
-
 const scene = new Scene();
 const camera = new PerspectiveCamera();
+const GLOBE_RADIUS = 100;
 camera.position.set(0, 0, GLOBE_RADIUS * 7);
 
 const setTilt = () => {
 	graticulesObj.rotation.z = - Math.max(0, (camera.position.z - 2 * GLOBE_RADIUS) / 700); // tilt to side
 };
 
-const zoomCamera = (diff) => {
-	const newPosition = camera.position.z * (1 + diff);
-	camera.position.z = Math.min(camera.far, Math.max(GLOBE_RADIUS * 1.2, newPosition));
-	// graticulesObj.position.x = ((camera.position.z - GLOBE_RADIUS * 1.2) / 100) ** 1.5;
-	setTilt();
-};
-glRenderer.domElement.addEventListener('wheel', (e) => {
-	e.preventDefault();
-	zoomCamera(e.deltaY / 500);
-});
-// TODO implement pinching https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures
 
 // move globe slightly off center (20% to the right)
 // camera.setViewOffset(window.innerWidth, window.innerHeight, -.2 * window.innerWidth, 0, window.innerWidth, window.innerHeight);
@@ -201,46 +189,67 @@ close.ontouchend = close.onclick;
 
 const easeTime = 1500;
 
+var touchedProject = null;
+
 // add hover + click actions for every project image
-const zoomScale = 1.05;
+const focusScale = 1.05;
+const focusOn = (e) => {
+	glRenderer.domElement.style.cursor = 'pointer';
+	new TWEEN.Tween(e.target.scale).to({x: focusScale, y: focusScale, z: focusScale}, 200).easing(TWEEN.Easing.Linear.None).start();
+};
+const focusOut = (e) => {
+	touchedProject = null; // TODO need to find equivalent for touch pointer
+	new TWEEN.Tween(e.target.scale).to({x: 1, y: 1, z: 1}, 100).easing(TWEEN.Easing.Linear.None).start();
+	glRenderer.domElement.style.cursor = 'initial';
+};
+
+const selectProject = (e) => {
+	untouched = false;
+
+	if (e.type === 'pointerdown') {
+		touchedProject = e.target.name;
+		// e.target.releasePointerCapture(e.pointerId);
+		return;
+	}
+	if (touchedProject !== e.target.name) {
+		return;
+	}
+	touchedProject = null;
+
+	const scaled = e.target;
+	let phi = Math.PI / 2 - scaled.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
+	const theta = Math.PI / 2 - scaled.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
+	const diff = phi - (graticulesObj.rotation.y) % (2 * Math.PI);
+
+	const xhr = new XMLHttpRequest;
+	xhr.open('GET', '/static/' + scaled.name + '/');
+	xhr.responseType = 'document';
+	xhr.onload = () => {
+		if (xhr.readyState === xhr.DONE && xhr.status === 200) {
+			content.replaceChildren(...xhr.response.getElementById('content').childNodes);
+			content.dataset.title = xhr.response.title;
+			window.history.replaceState(scaled.name, content.dataset.title, window.location.origin + '/' + scaled.name);
+			processContent();
+		}
+	};
+	xhr.send();
+
+	new TWEEN.Tween(graticulesObj.rotation).to({x: theta, y: graticulesObj.rotation.y + diff, z: 0}, easeTime).easing(easing).start().onComplete((e) => {
+		overlay.classList = 'visible';
+		if (content.hasChildNodes()) {
+			setTitle(content.dataset.title);
+		}
+	});
+	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(TWEEN.Easing.Back.In).start();
+}
+
 graticulesObj.children.forEach((p) => {
 	interactionManager.add(p);
-	p.addEventListener('mouseover', (e) => {
-		glRenderer.domElement.style.cursor = 'pointer';
-		new TWEEN.Tween(e.target.scale).to({x: zoomScale, y: zoomScale, z: zoomScale}, 200).easing(TWEEN.Easing.Linear.None).start();
-	});
-	p.addEventListener('mouseout', (e) => {
-		new TWEEN.Tween(e.target.scale).to({x: 1, y: 1, z: 1}, 100).easing(TWEEN.Easing.Linear.None).start();
-		glRenderer.domElement.style.cursor = 'initial';
-	});
-	p.addEventListener('click', (e) => {
-		untouched = false;
-		const scaled = e.target;
-		let phi = Math.PI / 2 - scaled.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
-		const theta = Math.PI / 2 - scaled.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
-		const diff = phi - (graticulesObj.rotation.y) % (2 * Math.PI);
-
-		const xhr = new XMLHttpRequest;
-		xhr.open('GET', '/static/' + scaled.name + '/');
-		xhr.responseType = 'document';
-		xhr.onload = () => {
-			if (xhr.readyState === xhr.DONE && xhr.status === 200) {
-				content.replaceChildren(...xhr.response.getElementById('content').childNodes);
-				content.dataset.title = xhr.response.title;
-				processContent();
-			}
-		};
-		xhr.send();
-		document.location.hash = scaled.name;
-
-		new TWEEN.Tween(graticulesObj.rotation).to({x: theta, y: graticulesObj.rotation.y + diff, z: 0}, easeTime).easing(easing).start().onComplete((e) => {
-			overlay.classList = 'visible';
-			if (content.hasChildNodes()) {
-				setTitle(content.dataset.title);
-			}
-		});
-		new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(TWEEN.Easing.Back.In).start();
-	});
+	p.addEventListener('mouseover', focusOn);
+	p.addEventListener('mouseout', focusOut);
+	p.addEventListener('pointerdown', selectProject);
+	p.addEventListener('pointerup', selectProject);
+	p.addEventListener('pointerleave', (e) => {console.log('leave');});
 });
 
 const setColors = () => {
@@ -255,43 +264,79 @@ document.getElementById('darkmode').addEventListener('click', (e) => {
 	setColors();
 });
 
+// MOUSE / POINTER EFFECTS
+const zoomCamera = (diff) => {
+	const newPosition = camera.position.z * (1 + diff);
+	camera.position.z = Math.min(camera.far, Math.max(GLOBE_RADIUS * 1.2, newPosition));
+	// graticulesObj.position.x = ((camera.position.z - GLOBE_RADIUS * 1.2) / 100) ** 1.5;
+	setTilt();
+};
+
+// MOUSE / POINTER EVENTS
+
+glRenderer.domElement.addEventListener('wheel', (e) => {
+	e.preventDefault();
+	zoomCamera(e.deltaY / 500);
+});
+
 var untouched = true;
 var mouseDown = false;
 
-var mousePos = [0, 0];
-glRenderer.domElement.addEventListener('mousedown', (e) => {
-	mouseDown = true;
-	mousePos = [e.offsetX, e.offsetY];
-});
-glRenderer.domElement.addEventListener('touchstart', (e) => {
-	mouseDown = true;
-	mousePos = [e.touches[0].clientX, e.touches[0].clientY];
-});
+const pointerCache = [];
+var prevPinchDiff = -1;
 
-glRenderer.domElement.addEventListener('mouseup', (e) => {
-	mouseDown = false;
-});
-glRenderer.domElement.addEventListener('touchend', (e) => {
-	mouseDown = false;
-});
-glRenderer.domElement.addEventListener('mousemove', (e) => {
-	if (mouseDown) {
-		untouched = false;
-		const polar = graticulesObj.rotation.x + camera.position.z * (e.offsetY - mousePos[1]) / 80000;
-		graticulesObj.rotation.x = Math.min(Math.PI / 3, Math.max(polar, -Math.PI / 3));
-		graticulesObj.rotation.y += camera.position.z * (e.offsetX - mousePos[0]) / 80000;
-		mousePos = [e.offsetX, e.offsetY];
-	}
-});
-glRenderer.domElement.addEventListener('touchmove', (e) => {
-	if (mouseDown) {
-		untouched = false;
-		const polar = graticulesObj.rotation.x + camera.position.z * (e.touches[0].clientY - mousePos[1]) / 80000;
+const pointerdownHandler = (e) => {
+	// The pointerdown event signals the start of a touch interaction.
+	untouched = false;
+	// This event is cached to support 2-finger gestures
+	pointerCache.push(e);
+};
+
+const pointermoveHandler = (e) => {
+	const index = pointerCache.findIndex((cachedEv) => cachedEv.pointerId === e.pointerId);
+
+	// If two pointers are down, check for pinch gestures
+	if (pointerCache.length === 2) {
+		pointerCache[index] = e;
+		// Calculate the distance between the two pointers
+		const curDiff = Math.abs(pointerCache[0].clientX - pointerCache[1].clientX);
+		if (prevPinchDiff > 0) {
+			if (curDiff > prevPinchDiff) {
+				// The distance between the two pointers has increased
+				console.log("Pinch moving OUT -> Zoom in");
+			}
+			if (curDiff < prevPinchDiff) {
+				// The distance between the two pointers has decreased
+				console.log("Pinch moving IN -> Zoom out");
+			}
+		}
+
+		// Cache the distance for the next move event
+		prevPinchDiff = curDiff;
+	} else if (pointerCache.length === 1) {
+		const polar = graticulesObj.rotation.x + camera.position.z * (e.clientY - pointerCache[index].clientY) / 80000;
 		graticulesObj.rotation.x = Math.min(Math.PI / 4, Math.max(polar, -Math.PI / 4));
-		graticulesObj.rotation.y += camera.position.z * (e.touches[0].clientX - mousePos[0]) / 80000;
-		mousePos = [e.touches[0].clientX, e.touches[0].clientY];
+		graticulesObj.rotation.y += camera.position.z * (e.clientX - pointerCache[index].clientX) / 80000;
+		pointerCache[index] = e;
 	}
-});
+};
+
+const pointerupHandler = (e) => {
+	const index = pointerCache.findIndex((cachedEv) => cachedEv.pointerId === e.pointerId);
+	pointerCache.splice(index, 1);
+
+	if (pointerCache.length < 2) {
+		prevPinchDiff = -1;
+	}
+};
+
+const el = glRenderer.domElement;
+el.onpointerdown = pointerdownHandler;
+el.onpointermove = pointermoveHandler;
+el.onpointerup = pointerupHandler;
+el.onpointercancel = pointerupHandler;
+el.onpointerout = pointerupHandler;
+el.onpointerleave = pointerupHandler;
 
 function animate() {
 	requestAnimationFrame(animate);
