@@ -33,7 +33,7 @@ var darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: da
 
 const glRenderer = new WebGLRenderer({antialias: true});
 document.body.appendChild(glRenderer.domElement);
-// glRenderer.setPixelRatio(window.devicePixelRatio);
+glRenderer.setPixelRatio(window.devicePixelRatio);
 
 // overlay additional on top of main renderer
 glRenderer.domElement.style.position = 'absolute';
@@ -98,8 +98,10 @@ composer.addPass(renderScene);
 // composer.addPass(bloomPass);
 
 const onResize = () => {
-	var width = window.innerWidth * window.devicePixelRatio;
-	var height = window.innerHeight * window.devicePixelRatio;
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+	// var width = glRenderer.domElement.clientWidth * window.devicePixelRatio;
+	// var height = glRenderer.domElement.clientHeight * window.devicePixelRatio;
 	// cssRenderer.setSize(width, height);
 	camera.aspect = width / height;
 	camera.updateProjectionMatrix();
@@ -171,7 +173,7 @@ const interactionManager = new InteractionManager(
 const easing = TWEEN.Easing.Quartic.InOut;
 const header = document.getElementById('title');
 const setTitle = (t) => {
-	header.textContent = t;
+	header.textContent = window.devicePixelRatio.toString() + t;
 	if (t != header.dataset.default) {
 		t += ' | the Futile Corporation';
 	}
