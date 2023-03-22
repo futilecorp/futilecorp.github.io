@@ -34,8 +34,14 @@ module.exports = {
 				target: 'https://futilecorp.github.io',
 				secure: false,
 				changeOrigin: true
+			},
+			'/[a-z]*':
+			{
+				target: 'http://127.0.0.1:8080',
+				pathRewrite: function (path, req) {
+					return '/';
+				}
 			}
 		}
-
 	}
 };

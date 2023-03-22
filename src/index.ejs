@@ -28,6 +28,7 @@ const processContent = () => {
 	readmore.children[0].onclick = (e) => {
 		readmore.style.display = 'none';
 		remainder.style.display = 'block';
+		remainder.scrollIntoView();
 	};
 	readmore.style.display = 'block';
 	remainder.style.display = 'none';

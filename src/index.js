@@ -131,8 +131,8 @@ const materials = projects.map((s) =>
 const longitudes = [0];
 const latitudes = [N_TILES[1] / 2];
 projects.forEach((p, i) => {
-	longitudes.push(longitudes[i] + 1 + Math.floor(Math.random() * 4));
-	latitudes.push((N_TILES[1] - USABLE_LATITUDES) / 2 + (latitudes[i] + 1 + Math.floor(Math.random() * USABLE_LATITUDES)) % USABLE_LATITUDES);
+	longitudes.push(longitudes[i] + 1 + Math.floor(Math.random() * 3));
+	latitudes.push((N_TILES[1] - USABLE_LATITUDES) / 2 + (latitudes[i] + 1 + Math.floor(Math.random() * (USABLE_LATITUDES - 1))) % USABLE_LATITUDES);
 	// tileHeight * (N_TILES[1] - USABLE_LATITUDES)/2
 });
 
@@ -190,7 +190,7 @@ close.onclick = (e) => {
 	// console.log(e.type);
 	overlay.classList = '';
 	setTitle(header.dataset.default);
-	document.location.hash = '';
+	window.history.replaceState('', document.title, window.location.origin + '/');
 	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.7}, 1000).easing(TWEEN.Easing.Quartic.Out).start();
 	content.replaceChildren();
 };
@@ -213,6 +213,38 @@ const focusOut = (e) => {
 	glRenderer.domElement.style.cursor = 'initial';
 };
 
+const projectRotation = (p) => {
+	let phi = Math.PI / 2 - p.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
+	const theta = Math.PI / 2 - p.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
+	return {x: theta, y: phi, z: 0};
+};
+const loadProject = (name) => {
+	console.log(name);
+	const xhr = new XMLHttpRequest;
+	xhr.open('GET', '/static/' + name + '/');
+	xhr.responseType = 'document';
+	xhr.onload = () => {
+		if (xhr.readyState === xhr.DONE && xhr.status === 200) {
+			content.replaceChildren(...xhr.response.getElementById('content').childNodes);
+			content.dataset.title = xhr.response.getElementById('content').dataset.title;
+			window.history.replaceState(name, content.dataset.title, window.location.origin + '/' + name);
+			processContent();
+		}
+	};
+	xhr.send();
+};
+const showContent = () => {
+	overlay.classList = 'visible';
+	if (content.hasChildNodes()) {
+		setTitle(content.dataset.title);
+	}
+};
+
+if (window.location.pathname != '/') {
+	loadProject(window.location.pathname.split('/')[1]);
+	showContent();
+}
+
 const selectProject = (e) => {
 	untouched = false;
 
@@ -228,30 +260,12 @@ const selectProject = (e) => {
 
 	// TODO disable focussing
 	focusOut(e);
-	const scaled = e.target;
-	let phi = Math.PI / 2 - scaled.geometry.parameters.phiStart - Math.PI / N_TILES[0]; // left/right
-	const theta = Math.PI / 2 - scaled.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
-	const diff = phi - (graticulesObj.rotation.y) % (2 * Math.PI);
+	loadProject(e.target.name);
 
-	const xhr = new XMLHttpRequest;
-	xhr.open('GET', '/static/' + scaled.name + '/');
-	xhr.responseType = 'document';
-	xhr.onload = () => {
-		if (xhr.readyState === xhr.DONE && xhr.status === 200) {
-			content.replaceChildren(...xhr.response.getElementById('content').childNodes);
-			content.dataset.title = xhr.response.getElementById('content').dataset.title;
-			window.history.replaceState(scaled.name, content.dataset.title, window.location.origin + '/' + scaled.name);
-			processContent();
-		}
-	};
-	xhr.send();
-
-	new TWEEN.Tween(graticulesObj.rotation).to({x: theta, y: graticulesObj.rotation.y + diff, z: 0}, easeTime).easing(easing).start().onComplete((e) => {
-		overlay.classList = 'visible';
-		if (content.hasChildNodes()) {
-			setTitle(content.dataset.title);
-		}
-	});
+	const target = projectRotation(e.target);
+	const diff = (Math.PI + target.y - graticulesObj.rotation.y) % (2 * Math.PI) - Math.PI;
+	target.y = graticulesObj.rotation.y + diff;
+	new TWEEN.Tween(graticulesObj.rotation).to(target, easeTime).easing(easing).start().onComplete(showContent);
 	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(TWEEN.Easing.Back.In).start();
 }
 
@@ -315,7 +329,7 @@ const pointermoveHandler = (e) => {
 		// Calculate the distance between the two pointers
 		const curDiff = Math.abs(pointerCache[0].clientX - pointerCache[1].clientX);
 		if (prevPinchDiff > 0) {
-			zoomCamera((prevPinchDiff - curDiff) / 30);
+			zoomCamera((prevPinchDiff - curDiff) / 50);
 			if (curDiff > prevPinchDiff) {
 				// The distance between the two pointers has increased
 				console.log("Pinch moving OUT -> Zoom in");
