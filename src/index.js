@@ -119,11 +119,11 @@ onResize();
 
 // PROJECT IMAGES
 const textureLoader = new TextureLoader();
-const projects = ['localmeantime', 'everythingisinterestingonce', 'landuse', 'borderlands', 'theview', 'za', 'everybodyelse'];
+const projects = ['localmeantime', 'everythingisinterestingonce', 'paranoidcentrist', 'landuse', 'borderlands', 'theview', 'za', 'everybodyelse'];
 const materials = projects.map((s) =>
 	new MeshPhongMaterial({
 		map: textureLoader.load(
-			'https://res.cloudinary.com/futile/f_auto,q_auto/k/' + s + '.jpg'
+			'https://res.cloudinary.com/futile/f_jpg,q_auto/k/' + s + '.jpg'
 		),
 		side: DoubleSide
 	}),
