@@ -60,7 +60,11 @@ const setTilt = () => {
 // cssRenderer.domElement.style.top = 0;
 
 scene.add(new AmbientLight(0xbbbbbb));
-scene.add(new DirectionalLight(0xffffff, 0.6));
+const daylight = new DirectionalLight(0xffffff, .8);
+daylight.position.x = -.5;
+daylight.position.y = 0;
+daylight.position.z = .5;
+scene.add(daylight);
 
 // GLOBE
 const N_TILES = [16, 12]; // long, lat
@@ -173,7 +177,7 @@ const interactionManager = new InteractionManager(
 const easing = TWEEN.Easing.Quartic.InOut;
 const header = document.getElementById('title');
 const setTitle = (t) => {
-	header.textContent = window.devicePixelRatio.toString() + t;
+	header.textContent = t;
 	if (t != header.dataset.default) {
 		t += ' | the Futile Corporation';
 	}
