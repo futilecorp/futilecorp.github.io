@@ -1,44 +1,44 @@
 import {
-	AxesHelper,
-	Scene,
+	AmbientLight,
 	Color,
+	DefaultLoadingManager,
+	DirectionalLight,
+	DoubleSide,
 	PerspectiveCamera,
-	OrthographicCamera,
-	WebGLRenderer,
 	LineBasicMaterial,
+	LineSegments,
 	MeshPhongMaterial,
 	Mesh,
 	SphereGeometry,
-	Group,
-	AmbientLight,
-	DirectionalLight,
+	Scene,
 	TextureLoader,
-	LineSegments,
-	Raycaster,
 	Vector2,
-	Vector3,
-	DoubleSide
+	WebGLRenderer,
 } from 'three';
-// import {CSS2DRenderer} from 'three/addons/renderers/CSS2DRenderer.js';
 import {InteractionManager} from 'three.interactive';
 
-import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
-import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+// import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+// import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+// import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {GeoJsonGeometry} from 'three-geojson-geometry';
 import graticule from '../node_modules/d3-geo/src/graticule';
 import {TWEEN} from 'three/examples/jsm/libs/tween.module.min'
 
 var darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+var untouched = true; // controls if an intro animatin rotation is played
 
 const glRenderer = new WebGLRenderer({antialias: true});
 document.body.appendChild(glRenderer.domElement);
 glRenderer.setPixelRatio(window.devicePixelRatio);
 
+DefaultLoadingManager.onLoad = function () {
+	glRenderer.domElement.style.opacity = 1;
+};
+
 // overlay additional on top of main renderer
-glRenderer.domElement.style.position = 'absolute';
-glRenderer.domElement.style.zIndex = 1;
-glRenderer.domElement.style.top = 0;
+// glRenderer.domElement.style.position = 'absolute';
+// glRenderer.domElement.style.zIndex = 1;
+// glRenderer.domElement.style.top = 0;
 // glRenderer.domElement.style.pointerEvents = 'none';
 
 const scene = new Scene();
@@ -92,13 +92,13 @@ setTilt();
 scene.add(graticulesObj);
 
 // GLOBE BLOOM
-const renderScene = new RenderPass(scene, camera);
-const bloomPass = new UnrealBloomPass(new Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-bloomPass.threshold = .2;
-bloomPass.radius = .001;
+// const renderScene = new RenderPass(scene, camera);
+// const bloomPass = new UnrealBloomPass(new Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+// bloomPass.threshold = .2;
+// bloomPass.radius = .001;
 
-const composer = new EffectComposer(glRenderer);
-composer.addPass(renderScene);
+// const composer = new EffectComposer(glRenderer);
+// composer.addPass(renderScene);
 // composer.addPass(bloomPass);
 
 const onResize = () => {
@@ -110,7 +110,7 @@ const onResize = () => {
 	camera.aspect = width / height;
 	camera.updateProjectionMatrix();
 	glRenderer.setSize(width, height);
-	composer.setSize(width, height);
+	// composer.setSize(width, height);
 	// controls.handleResize();
 };
 window.addEventListener('resize', onResize);
@@ -120,13 +120,16 @@ onResize();
 // PROJECT IMAGES
 const textureLoader = new TextureLoader();
 const projects = ['localmeantime', 'everythingisinterestingonce', 'paranoidcentrist', 'landuse', 'borderlands', 'theview', 'za', 'everybodyelse'];
-const materials = projects.map((s) =>
-	new MeshPhongMaterial({
+const getpng = ['borderlands', 'landuse'];
+const materials = projects.map((s) => {
+	const ext = getpng.includes(s) ? 'png' : 'jpg';
+	return new MeshPhongMaterial({
 		map: textureLoader.load(
-			'https://res.cloudinary.com/futile/f_jpg,q_auto/k/' + s + '.jpg'
+			'https://res.cloudinary.com/futile/f_' + ext + ',q_auto,w_1024,dpr_auto,ar_4:3/' + s + '.' + ext
 		),
 		side: DoubleSide
-	}),
+	});
+}
 );
 const longitudes = [0];
 const latitudes = [N_TILES[1] / 2];
@@ -204,10 +207,16 @@ var touchedProject = null;
 // add hover + click actions for every project image
 const focusScale = 1.05;
 const focusOn = (e) => {
+	if (overlay.classList == 'visible') {
+		return;
+	}
 	glRenderer.domElement.style.cursor = 'pointer';
 	new TWEEN.Tween(e.target.scale).to({x: focusScale, y: focusScale, z: focusScale}, 200).easing(TWEEN.Easing.Linear.None).start();
 };
 const focusOut = (e) => {
+	for (var t of TWEEN.getAll()) {
+		// t.stop();
+	}
 	touchedProject = null; // TODO need to find equivalent for touch pointer
 	new TWEEN.Tween(e.target.scale).to({x: 1, y: 1, z: 1}, 100).easing(TWEEN.Easing.Linear.None).start();
 	glRenderer.domElement.style.cursor = 'initial';
@@ -219,7 +228,6 @@ const projectRotation = (p) => {
 	return {x: theta, y: phi, z: 0};
 };
 const loadProject = (name) => {
-	console.log(name);
 	const xhr = new XMLHttpRequest;
 	xhr.open('GET', '/static/' + name + '/');
 	xhr.responseType = 'document';
@@ -243,6 +251,7 @@ const showContent = () => {
 if (window.location.pathname != '/') {
 	loadProject(window.location.pathname.split('/')[1]);
 	showContent();
+	untouched = false;
 }
 
 const selectProject = (e) => {
@@ -258,15 +267,16 @@ const selectProject = (e) => {
 	}
 	touchedProject = null;
 
-	// TODO disable focussing
-	focusOut(e);
 	loadProject(e.target.name);
 
 	const target = projectRotation(e.target);
-	const diff = (Math.PI + target.y - graticulesObj.rotation.y) % (2 * Math.PI) - Math.PI;
-	target.y = graticulesObj.rotation.y + diff;
+	const xdiff = target.x - graticulesObj.x;
+	const ydiff = (Math.PI + target.y - graticulesObj.rotation.y) % (2 * Math.PI) - Math.PI;
+	const zdiff = camera.position.z / GLOBE_RADIUS;
+	target.y = graticulesObj.rotation.y + ydiff;
 	new TWEEN.Tween(graticulesObj.rotation).to(target, easeTime).easing(easing).start().onComplete(showContent);
-	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(TWEEN.Easing.Back.In).start();
+	const camEasing = zdiff < 2 ? TWEEN.Easing.Back.In : TWEEN.Easing.Quartic.Out;
+	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.3}, easeTime).easing(camEasing).start();
 }
 
 graticulesObj.children.forEach((p) => {
@@ -307,7 +317,6 @@ glRenderer.domElement.addEventListener('wheel', (e) => {
 	zoomCamera(e.deltaY / 500);
 });
 
-var untouched = true;
 var mouseDown = false;
 
 const pointerCache = [];
@@ -375,9 +384,7 @@ function animate() {
 	}
 	TWEEN.update();
 
-	if (darkMode) {
-		composer.render();
-	} else {
+	if (overlay.classList == "") {
 		glRenderer.render(scene, camera);
 	}
 }
