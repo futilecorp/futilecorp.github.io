@@ -1,9 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+  	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-96498670-1"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+			gtag('config', 'UA-96498670-1');
+		</script>
     <meta charset="utf-8">
-    <title>the Futile Corporation</title>
-		<link href="/static/style.css" rel="stylesheet">
+    <title>{{ title }}</title>
+		<link href="/style.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -12,29 +19,26 @@
 		<meta http-equiv="Accept-CH" content="DPR, Width">
   </head>
   <body>
-		<div id="title" data-default="the Futile Corporation">the Futile Corporation</div>
-		<input id="darkmode" type="checkbox">
-		<div id="overlay">
-			<div id="close">x</div>
-			<div id="content"></div>
+		<div id="title" data-default="the Futile Corporation">{{ page.title }}</div>
+		 
+		<div id="darkmode" class="button">&#9680;</div>
+		<a href="/about/" id="about" class="button" alt="about">?</a>
+		<div id="overlay" class="{%- if page.title -%}visible{%- endif -%}">
+			<a href="/" id="close" class="button">X</a>
+			<div id="content" data-title="{{ page.title }}">
+				<section>
+					{% assign content_array = content | split: site.excerpt_separator %}
+					{% assign leader = content_array | first %}
+					{% assign remainder = content_array | last %}
+					{{ leader }}
+				</section>
+				{%- unless leader == remainder -%}
+					<p id="readmore" style="display: none; cursor: pointer;"><a>Read more...</a></p>
+					<section id="remainder">
+				{{ remainder }}
+					</section>
+				{%- endunless -%}
+			</div>
 		</div>
 	</body>
-<script type="text/javascript">
-const processContent = () => {
-	const readmore = document.getElementById('readmore');
-		if (!readmore) {
-			return;
-		}
-	const remainder = document.getElementById('remainder');
-	readmore.children[0].onclick = (e) => {
-		readmore.style.display = 'none';
-		remainder.style.display = 'block';
-		remainder.scrollIntoView();
-	};
-	readmore.style.display = 'block';
-	remainder.style.display = 'none';
-	const lightbox = GLightbox();
-}
-processContent();
-</script>
 </html>

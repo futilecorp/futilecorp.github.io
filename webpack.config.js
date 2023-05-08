@@ -6,7 +6,9 @@ const threeMinifier = new ThreeMinifierPlugin();
 module.exports = {
 	plugins: [
 		threeMinifier,
-		new HtmlWebpackPlugin()
+		new HtmlWebpackPlugin({
+			publicPath: "/"
+		})
 	],
 	resolve: {
 		plugins: [
@@ -27,20 +29,16 @@ module.exports = {
 			'Cache-Control': 'no-store',
 		},
 		proxy: {
-			'/static':
+			'/style.css':
 			{
-				// target: 'http://127.0.0.1:4000',
-				// pathRewrite: {'/static': ''},
-				target: 'https://futilecorp.github.io',
-				secure: false,
-				changeOrigin: true
+				target: 'http://127.0.0.1:4000',
+				// target: 'https://futilecorp.github.io',
+				// secure: false,
+				// changeOrigin: true
 			},
-			'/[a-z]*':
+			'/about':
 			{
-				target: 'http://127.0.0.1:8080',
-				pathRewrite: function (path, req) {
-					return '/';
-				}
+				target: 'http://127.0.0.1:4000',
 			}
 		}
 	}

@@ -17,12 +17,30 @@ import {
 } from 'three';
 import {InteractionManager} from 'three.interactive';
 
-// import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
-// import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-// import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {GeoJsonGeometry} from 'three-geojson-geometry';
 import graticule from '../node_modules/d3-geo/src/graticule';
 import {TWEEN} from 'three/examples/jsm/libs/tween.module.min'
+
+const lightbox = GLightbox();
+const processContent = () => {
+	lightbox.reload();
+	const readmore = document.getElementById('readmore');
+	if (!readmore) {
+		return;
+	}
+	const remainder = document.getElementById('remainder');
+	readmore.children[0].onclick = (e) => {
+		readmore.style.display = 'none';
+		remainder.style.display = 'block';
+		remainder.scrollIntoView();
+	};
+	readmore.style.display = 'block';
+	remainder.style.display = 'none';
+}
+// call when first page load is finished
+document.addEventListener('DOMContentLoaded', () => {
+	processContent();
+}, false);
 
 var darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 var untouched = true; // controls if an intro animatin rotation is played
@@ -77,6 +95,7 @@ const graticuleGen = graticule();
 graticuleGen.stepMajor([90, 360]);
 graticuleGen.stepMinor([tileWidth, tileHeight]);
 graticuleGen.extentMinor([[-180, -90 + tileHeight], [180, 90 - tileHeight + .01]]);
+graticuleGen.precision(5);
 const graticulesObj = new LineSegments(
 	new GeoJsonGeometry(graticuleGen(), GLOBE_RADIUS, 2),
 	new LineBasicMaterial({
@@ -101,6 +120,8 @@ scene.add(graticulesObj);
 // composer.addPass(renderScene);
 // composer.addPass(bloomPass);
 
+var hasChanges = true;
+
 const onResize = () => {
 	var width = window.innerWidth;
 	var height = window.innerHeight;
@@ -110,6 +131,7 @@ const onResize = () => {
 	camera.aspect = width / height;
 	camera.updateProjectionMatrix();
 	glRenderer.setSize(width, height);
+	hasChanges = true;
 	// composer.setSize(width, height);
 	// controls.handleResize();
 };
@@ -123,11 +145,13 @@ const projects = ['localmeantime', 'everythingisinterestingonce', 'paranoidcentr
 const getpng = ['borderlands', 'landuse'];
 const materials = projects.map((s) => {
 	const ext = getpng.includes(s) ? 'png' : 'jpg';
+	const url = getpng.includes(s) ?
+		'https://res.cloudinary.com/futile/f_png,q_auto,w_1024,dpr_auto,ar_4:3/e_bgremoval/' + s + '.png' :
+		'https://res.cloudinary.com/futile/f_jpg,q_auto,w_1024,dpr_auto,ar_4:3/' + s + '.jpg';
 	return new MeshPhongMaterial({
-		map: textureLoader.load(
-			'https://res.cloudinary.com/futile/f_' + ext + ',q_auto,w_1024,dpr_auto,ar_4:3/' + s + '.' + ext
-		),
-		side: DoubleSide
+		map: textureLoader.load(url),
+		side: DoubleSide,
+		transparent: ext == 'png'
 	});
 }
 );
@@ -176,7 +200,6 @@ const interactionManager = new InteractionManager(
 	glRenderer.domElement
 );
 
-// const easing = TWEEN.Easing.Back.In;
 const easing = TWEEN.Easing.Quartic.InOut;
 const header = document.getElementById('title');
 const setTitle = (t) => {
@@ -186,15 +209,19 @@ const setTitle = (t) => {
 	}
 	document.title = t;
 };
+
 const overlay = document.getElementById('overlay');
 const content = document.getElementById('content');
 const close = document.getElementById('close');
-close.onclick = (e) => {
-	// console.log(e.type);
+const hideContent = () => {
 	overlay.classList = '';
+};
+close.onclick = (e) => {
+	e.preventDefault();
+	hideContent();
 	setTitle(header.dataset.default);
 	window.history.replaceState('', document.title, window.location.origin + '/');
-	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.7}, 1000).easing(TWEEN.Easing.Quartic.Out).start();
+	new TWEEN.Tween(camera.position).to({x: 0, y: 0, z: GLOBE_RADIUS * 1.9}, easeTime).easing(TWEEN.Easing.Quartic.Out).start();
 	content.replaceChildren();
 };
 close.ontouchend = close.onclick;
@@ -211,11 +238,16 @@ const focusOn = (e) => {
 		return;
 	}
 	glRenderer.domElement.style.cursor = 'pointer';
+	// TODO show title/info
 	new TWEEN.Tween(e.target.scale).to({x: focusScale, y: focusScale, z: focusScale}, 200).easing(TWEEN.Easing.Linear.None).start();
 };
 const focusOut = (e) => {
+	// TODO hide title/info
 	for (var t of TWEEN.getAll()) {
-		// t.stop();
+		if (t._duration != easeTime) {
+			// not a flying animation
+			t.stop();
+		}
 	}
 	touchedProject = null; // TODO need to find equivalent for touch pointer
 	new TWEEN.Tween(e.target.scale).to({x: 1, y: 1, z: 1}, 100).easing(TWEEN.Easing.Linear.None).start();
@@ -227,16 +259,23 @@ const projectRotation = (p) => {
 	const theta = Math.PI / 2 - p.geometry.parameters.thetaStart - Math.PI / (2 * N_TILES[1]); // top/down
 	return {x: theta, y: phi, z: 0};
 };
-const loadProject = (name) => {
+const pageUrl = (name) => {
+	return `/about/${name}/`
+};
+const loadProject = (name, direct = false) => {
 	const xhr = new XMLHttpRequest;
-	xhr.open('GET', '/static/' + name + '/');
+	const target = direct ? name : pageUrl(name);
+	xhr.open('GET', target);
 	xhr.responseType = 'document';
 	xhr.onload = () => {
 		if (xhr.readyState === xhr.DONE && xhr.status === 200) {
 			content.replaceChildren(...xhr.response.getElementById('content').childNodes);
 			content.dataset.title = xhr.response.getElementById('content').dataset.title;
-			window.history.replaceState(name, content.dataset.title, window.location.origin + '/' + name);
+			window.history.replaceState(name, content.dataset.title, window.location.origin + target);
 			processContent();
+			if (direct) {
+				showContent();
+			}
 		}
 	};
 	xhr.send();
@@ -248,10 +287,17 @@ const showContent = () => {
 	}
 };
 
+document.getElementById('about').onclick = (e) => {
+	e.preventDefault();
+	loadProject('/about/', true);
+}
+
 if (window.location.pathname != '/') {
 	loadProject(window.location.pathname.split('/')[1]);
 	showContent();
 	untouched = false;
+	// } else {
+	// hideContent();
 }
 
 const selectProject = (e) => {
@@ -270,8 +316,9 @@ const selectProject = (e) => {
 	loadProject(e.target.name);
 
 	const target = projectRotation(e.target);
-	const xdiff = target.x - graticulesObj.x;
+	// const xdiff = target.x - graticulesObj.x;
 	const ydiff = (Math.PI + target.y - graticulesObj.rotation.y) % (2 * Math.PI) - Math.PI;
+	// console.log(ydiff);
 	const zdiff = camera.position.z / GLOBE_RADIUS;
 	target.y = graticulesObj.rotation.y + ydiff;
 	new TWEEN.Tween(graticulesObj.rotation).to(target, easeTime).easing(easing).start().onComplete(showContent);
@@ -295,9 +342,9 @@ const setColors = () => {
 	});
 };
 setColors();
-document.getElementById('darkmode').checked = darkMode;
+// document.getElementById('darkmode').checked = darkMode;
 document.getElementById('darkmode').addEventListener('click', (e) => {
-	darkMode = e.target.checked;
+	darkMode = !darkMode;//e.target.checked;
 	document.body.classList = darkMode ? '' : 'light';
 	setColors();
 });
@@ -308,16 +355,18 @@ const zoomCamera = (diff) => {
 	camera.position.z = Math.min(camera.far, Math.max(GLOBE_RADIUS * 1.2, newPosition));
 	// graticulesObj.position.x = ((camera.position.z - GLOBE_RADIUS * 1.2) / 100) ** 1.5;
 	setTilt();
+	hasChanges = true;
 };
 
 // MOUSE / POINTER EVENTS
 
+var zoomVelocity = 0;
 glRenderer.domElement.addEventListener('wheel', (e) => {
 	e.preventDefault();
-	zoomCamera(e.deltaY / 500);
+	hasChanges = true;
+	zoomVelocity += e.deltaY; // TODO check e.deltaMode
+	// TODO rotate globe on deltaX
 });
-
-var mouseDown = false;
 
 const pointerCache = [];
 var prevPinchDiff = -1;
@@ -334,6 +383,7 @@ const pointermoveHandler = (e) => {
 
 	// If two pointers are down, check for pinch gestures
 	if (pointerCache.length === 2) {
+		hasChanges = true;
 		pointerCache[index] = e;
 		// Calculate the distance between the two pointers
 		const curDiff = Math.abs(pointerCache[0].clientX - pointerCache[1].clientX);
@@ -341,17 +391,18 @@ const pointermoveHandler = (e) => {
 			zoomCamera((prevPinchDiff - curDiff) / 50);
 			if (curDiff > prevPinchDiff) {
 				// The distance between the two pointers has increased
-				console.log("Pinch moving OUT -> Zoom in");
+				// console.log("Pinch moving OUT -> Zoom in");
 			}
 			if (curDiff < prevPinchDiff) {
 				// The distance between the two pointers has decreased
-				console.log("Pinch moving IN -> Zoom out");
+				// console.log("Pinch moving IN -> Zoom out");
 			}
 		}
 
 		// Cache the distance for the next move event
 		prevPinchDiff = curDiff;
 	} else if (pointerCache.length === 1) {
+		hasChanges = true;
 		const polar = graticulesObj.rotation.x + camera.position.z * (e.clientY - pointerCache[index].clientY) / 80000;
 		graticulesObj.rotation.x = Math.min(Math.PI / 4, Math.max(polar, -Math.PI / 4));
 		graticulesObj.rotation.y += camera.position.z * (e.clientX - pointerCache[index].clientX) / 80000;
@@ -376,16 +427,42 @@ el.onpointercancel = pointerupHandler;
 el.onpointerout = pointerupHandler;
 el.onpointerleave = pointerupHandler;
 
-function animate() {
-	requestAnimationFrame(animate);
+var start = Date.now();
+var rendered = 0;
+var skipped = 0;
+
+function animate(timestamp) {
 	interactionManager.update();
 	if (untouched) {
+		hasChanges = true;
 		graticulesObj.rotation.y += .004;
 	}
-	TWEEN.update();
-
-	if (overlay.classList == "") {
-		glRenderer.render(scene, camera);
+	if (TWEEN.getAll().length != 0) {
+		TWEEN.update();
+		hasChanges = true;
 	}
+	if (zoomVelocity != 0) {
+		zoomCamera(zoomVelocity / 2500);
+		zoomVelocity *= .8;
+		if (Math.abs(zoomVelocity) < .1) {
+			zoomVelocity = 0;
+		}
+	}
+
+	if (overlay.classList != "visible" && hasChanges) {
+		hasChanges = false;
+		glRenderer.render(scene, camera);
+		rendered++;
+	} else {
+		skipped++;
+	}
+	const now = Date.now();
+	if (now - 1000 > start) {
+		//console.log(`${rendered} fps, skipped ${skipped}`);
+		rendered = 0;
+		skipped = 0;
+		start = now;
+	}
+	requestAnimationFrame(animate);
 }
 animate();
